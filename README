@@ -1,0 +1,143 @@
+Enescu Maria
+
+Virtual Memory Allocator. Tema 1.
+
+
+In functia main, regasita in fisierul main.c, programul citeste o comanda de la
+tastatura, iar daca aceasta coincide cu una dintre comenzile corespunzatoare
+cerintei, continua sa citeasca parametrii (acolo unde este cazul), apoi
+apeleaza functia corespunzatoare fiecarei comenzi:
+
+
+    * Comanda ALLOC_ARENA <size>, prin intermediul functiei
+    arena_t *alloc_arena(const uint64_t size), aloca memorie
+    pentru structura arenei, initializand si arena_size cu
+    dimensiunea <size>. Acesta arena este folosita doar
+    pentru a simula existenta unui spatiu aferent zonelor de
+    memorie din lista dublu inlantuita a block-urilor,
+    anume alloc_list. Aceasta functie returneaza arena creata.
+
+
+    * Comanda DEALLOC_ARENA, prin intermediul functiei
+    void dealloc_arena(arena_t *arena), incheie programul
+    dupa ce dezaloca toate resursele folosite, astfel:
+    intr-un loop while, se parcurge lista de block-uri
+    alloc_list și se eliberează memoria pentru fiecare
+    miniblock din fiecare block, iar daca exista un buffer
+    de citire/scriere asociat, i se elibereaza memoria alocata
+    acestuia.Dupa ce toate miniblock-urile dintr-un block au fost
+    eliberate, se elibereaza memoria alocata pentru block-ul
+    respectiv. In final se elibereaza memoria alocata pentru
+    lista dubla inlantuita alloc_list si pentru arena.
+
+
+    * Comanda ALLOC_BLOCK <address> <size>, prin intermediul
+    functiei void alloc_block(arena_t *arena, const uint64_t address,
+    const uint64_t size), verifica: daca <address> este in cadrul
+    arenei, daca <address> + <size> nu depasesc dimensiunile
+    alocate pentru arena, daca nu exista un block de inceput in
+    lista, atunci creaza unul la adresa <address> de dimenziune <size>,
+    care are un miniblock.
+        ! Nota: In functia block_t *create_block(const uint16_t
+        address, const uint64_t size, int alloc_miniblock), 
+        parametrul alloc_miniblock imi sugereaza daca este cazul
+        sa aloc odata cu block-ul si un miniblock, astfel:
+        daca alloc_miniblock != 0, atunci aloc un miniblock,
+        altfel, nu aloc miniblock-ul decat prin utilizarea functiei
+        miniblock_t *create_miniblock(const uint16_t address, size_t size).
+    Intr-un loop while, se parcurge lista de block-uri alloc_list
+    si se verifica existenta zonei de memorie inainte de o aloca.
+    In cazul în care exista zone de memorie alocate in vecinatate,
+    atunci block-ul sau block-urile adiacente vor fi sterse din
+    lista de block-uri, iar noua zona de memorie va fi adaugata la
+    miniblock_list-ul block-ului celui din dreapta dintre cele
+    3 sau 2 block-uri vecine, astfel, zonele adiacente din memorie
+    vor fi in acelasi block. Daca nu exista nicio adresa din zona
+    de memorie [address, address + size) care sa fi fost alocata
+    anterior si nici nu are vecinatate cu aceasta, atunci se va
+    insera un nou block in lista.
+
+
+    * Comanda FREE_BLOCK <address>, prin intermediul functiei
+    void free_block(arena_t *arena, const uint64_t address),
+    elibereaza miniblock-ul de la adresa <address>, astfel:
+    parcurge printr-un loop while fiecare block din lista,
+    pana cand ajunge la block-ul in care <address> se afla in
+    intervalul [curr_block->start_address, curr_block->start_address +
+    curr_block->size]. Cand am aflat block-ul in care se afla <address>
+    atunci parcurg fiecare miniblock printr-un loop while pana cand
+    curr_miniblock->start_address == address, astfel, am aflat
+    miniblock-ul care se doreste a fi sters din lista. Daca acest
+    miniblock este unic intr-un block, atunci se va sterge inclusiv
+    block-ul si se vor reface legaturile in functie de pozitia acestuia
+    in lista de block-uri. Daca block-ul are mai multe miniblock-uri,
+    dar curr_miniblock este pe prima sau pe ultima pozitie din lista de
+    miniblock-uri, atunci listei de miniblock-uri i se pastreaza structura,
+    dar i se refac legaturile corespunzator si se elimina curr_miniblock.
+    Daca curr_miniblock se afla in mijlocul listei, atunci se muta tot ce
+    este dupa curr_miniblock intr-un alt block, stergand apoi miniblock-ul
+    curr_minilock din curr_block.
+        ! Nota: Am grija in permanenta sa scad din dimensiunea
+        lui curr_block dimensiunea miniblock-ului/ miniblock-urilor
+        pe care il/le elimin. Iar atunci cand miniblock-ul este primul
+        din lista de miniblock-uri, schimb adresa de inceput a block-ului
+        cu cea a urmatorului miniblock.
+    
+
+    * Comanda READ <address> <size>, prin intermediul functiei 
+    void read(arena_t *arena, uint64_t address, uint64_t size),
+    parcurge printr-un loop while fiecare block din lista,
+    pana cand ajunge la block-ul in care <address> se afla in
+    intervalul [curr_block->start_address, curr_block->start_address +
+    curr_block->size]. Cand am aflat block-ul in care se afla <address>
+    atunci parcurg fiecare miniblock printr-un loop while pana cand
+    aflu miniblock-ul ce contine <address>. Afisez din fiecare miniblock
+    datele corespunzatoare pana la epuizarea dimensiunii miniblock-ului,
+    trecand la urmatorul pana cand se afiseaza tot <size>, daca este posibil.
+    Daca nu sunt posibile cele mentionate anterior, atunci afisez mesajul
+    corespunzator fiecarei erori, inclusiv in cazul in care nu am 
+    permisiunea de read.
+
+    
+    * Comanda WRITE <address> <size> <data>, prin intermediul functiei
+    void write(arena_t *arena, const uint64_t address, const uint64_t size,
+    int8_t *data), parcurge printr-un loop while fiecare block din lista,
+    pana cand ajunge la block-ul in care <address> se afla in
+    intervalul [curr_block->start_address, curr_block->start_address +
+    curr_block->size]. Cand am aflat block-ul in care se afla <address>
+    atunci parcurg fiecare miniblock printr-un loop while pana cand
+    aflu miniblock-ul ce contine <address>. Scriu in fiecare miniblock
+    o parte din <data>> pana la epuizarea dimensiunii miniblock-ului,
+    trecand la urmatorul pana cand se scrie tot ce este inclus in <size>,
+    daca este posibil. Daca nu sunt posibile cele mentionate anterior,
+    atunci afisez mesajul corespunzator fiecarei erori, inclusiv in cazul
+    in care nu am permisiunea de read.
+
+
+    * Comanda PMAP, prin intermediul functiei void pmap(const arena_t *arena),
+    afiseaza informatiile corespunzatoarea fiecarei modificaria prin care a
+    trecut lista de block-uri si cea de miniblock-uri in formatul aferent.
+        ! Nota: Aici am creat o noua functie char* str_perm(uint8_t nr)
+        care imi returneaza pentru fiecarui miniblock permisiunea.
+
+
+    * Comanda MPROTECT <address> <command2>, prin intermediul functiei
+    void mprotect(arena_t *arena, uint64_t address, int8_t *permission), 
+    verifica daca adresa specificata reprezinta o adresa valida pentru
+    inceputul unei zone de memorie. In caz contrar, functia afiseaza un
+    mesaj de eroare si se termina. Daca adresa si dimensiunea sunt valide,
+    functia schimba permisiunile zonei de memorie asociate <address> cu noua
+    permisiune conform numararulei de biti specificat.
+
+Orice alta comanda va fi semnalata ca eroare sub forma unui mesaj
+corespunzator.
+
+Alte comentarii:
+
+    Din aceasta tema am invatat sa lucrez si sa inteleg in profunzime lista
+dublu inlantuita, cat si folosul ei in diferite situatii. Conceptul de 
+"lista in lista" mi s-a parut greu de vizualizat atunci cand adaugam sau
+stergeam un miniblock, intampinand probleme vizibile in testele de pe checker
+si la functia read. Alte probleme au mai fost cele de coding style, avand in
+vedere ca am lucrat strict pe scheletul dat pentru aceasta tema, trebuind
+sa impart mai apoi continutul unor functii si in alte functii.
